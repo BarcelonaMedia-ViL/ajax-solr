@@ -8,11 +8,11 @@
 AjaxSolr.Manager = AjaxSolr.AbstractManager.extend(
   /** @lends AjaxSolr.Manager.prototype */
   {
-  executeRequest: function (servlet, string, handler) {
+  executeRequest: function (servlet,set, string, handler) {
     var self = this;
-    string = string || this.store.string();
+    string = string || this.store[set].string();
     handler = handler || function (data) {
-      self.handleResponse(data);
+      self.handleResponse(data,set);
     };
     if (this.proxyUrl) {
       jQuery.post(this.proxyUrl, { query: string }, handler, 'json');
@@ -22,3 +22,5 @@ AjaxSolr.Manager = AjaxSolr.AbstractManager.extend(
     }
   }
 });
+
+

@@ -1,13 +1,16 @@
+/** Joan Codina 
+ *  Adapted to deal with multiple sets
+**/
 (function ($) {
 
-AjaxSolr.TextWidget = AjaxSolr.AbstractTextWidget.extend({
+AjaxSolr.TextWidget = AjaxSolr.AbstractFacetWidget.extend({
   init: function () {
     var self = this;
     $(this.target).find('input').bind('keydown', function(e) {
       if (e.which == 13) {
         var value = $(this).val();
-        if (value && self.set(value)) {
-          self.doRequest();
+        if (value && self.add(value)) {
+          self.manager.doRequest(0);
         }
       }
     });

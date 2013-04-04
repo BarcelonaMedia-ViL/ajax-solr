@@ -184,7 +184,7 @@ AjaxSolr.PagerWidget = AjaxSolr.AbstractWidget.extend(
     var self = this;
     return function () {
       self.manager.store.get('start').val((page - 1) * self.perPage());
-      self.doRequest();
+      self.manager.doSetsRequest([self.set]);
       return false;
     }
   },
@@ -246,20 +246,26 @@ AjaxSolr.PagerWidget = AjaxSolr.AbstractWidget.extend(
    * @returns {Number} The number of results to display per page.
    */
   perPage: function () {
-    return parseInt(this.manager.response.responseHeader && this.manager.response.responseHeader.params && this.manager.response.responseHeader.params.rows || this.manager.store.get('rows').val() || 10);
+    return parseInt(this.manager.response[this.set].responseHeader 
+      && this.manager.response[this.set].responseHeader.params 
+      && this.manager.response[this.set].responseHeader.params.rows 
+      || this.manager.store[this.set].get('rows').val() || 10);
   },
 
   /**
    * @returns {Number} The Solr offset parameter's value.
    */
   getOffset: function () {
-    return parseInt(this.manager.response.responseHeader && this.manager.response.responseHeader.params && this.manager.response.responseHeader.params.start || this.manager.store.get('start').val() || 0);
+    return parseInt(this.manager.response[this.set].responseHeader 
+          && this.manager.response[this.set].responseHeader.params 
+          && this.manager.response[this.set].responseHeader.params.start 
+         || this.manager.store[this.set].get('start').val() || 0);
   },
 
   afterRequest: function () {
     var perPage = this.perPage();
     var offset  = this.getOffset();
-    var total   = parseInt(this.manager.response.response.numFound);
+    var total   = parseInt(this.manager.response[this.set].response.numFound);
 
     // Normalize the offset to a multiple of perPage.
     offset = offset - offset % perPage;

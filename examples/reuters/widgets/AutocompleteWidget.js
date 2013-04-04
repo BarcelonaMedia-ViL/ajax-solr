@@ -26,17 +26,23 @@ AjaxSolr.AutocompleteWidget = AjaxSolr.AbstractTextWidget.extend({
         }
       }).result(function(e, facet) {
         self.requestSent = true;
-        if (self.manager.store.addByValue('fq', facet.field + ':' + AjaxSolr.Parameter.escapeValue(facet.value))) {
-          self.doRequest();
-        }
+        if (self.manager[self.set].store.addByValue('fq', facet.field + ':' + AjaxSolr.Parameter.escapeValue(facet.value))) {
+          var sets=self.manager.store[self.set].addQByValue('fq', facet.field , AjaxSolr.Parameter.escapeValue(facet.value),false,'+');
+          if (sets!=[]) {
+          self.manager.doSetsRequest(sets,0);
+        }    
+      }
       });
 
       // This has lower priority so that requestSent is set.
       $(self.target).find('input').bind('keydown', function(e) {
         if (self.requestSent === false && e.which == 13) {
           var value = $(this).val();
-          if (value && self.set(value)) {
-            self.doRequest();
+          if (value && self.set(value)) {        
+       		var sets=self.manager.store[self.set].addQByValue('fq', facet.field , AjaxSolr.Parameter.escapeValue(facet.value),false,'+');
+   			if (sets!=[]) {
+             self.manager.doSetsRequest(sets,0);
+			 }	
           }
         }
       });
@@ -46,11 +52,11 @@ AjaxSolr.AutocompleteWidget = AjaxSolr.AbstractTextWidget.extend({
     for (var i = 0; i < this.fields.length; i++) {
       params.push('facet.field=' + this.fields[i]);
     }
-    var values = this.manager.store.values('fq');
+    var values = this.manager.store[this.set].values('fq');
     for (var i = 0; i < values.length; i++) {
       params.push('fq=' + encodeURIComponent(values[i]));
     }
-    params.push('q=' + this.manager.store.get('q').val());
+    params.push('q=' + this.manager.store[this.set].get('q').val());
     jQuery.getJSON(this.manager.solrUrl + 'select?' + params.join('&') + '&wt=json&json.wrf=?', {}, callback);
   }
 });

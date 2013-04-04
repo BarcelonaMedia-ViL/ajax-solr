@@ -12,6 +12,9 @@
  *
  * <p>For a list of possible parameters, please consult the links below.</p>
  *
+ * Joan Codina
+ * Some transforms to allow multiple parameters storage.
+ *
  * @see http://wiki.apache.org/solr/CoreQueryParameters
  * @see http://wiki.apache.org/solr/CommonQueryParameters
  * @see http://wiki.apache.org/solr/SimpleFacetParameters
@@ -39,6 +42,14 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
    * @default []
    */
   exposed: [],
+  /** 
+   * list of duplicated sets.  A duplicated set is a set that copies all the query items from another set.
+   * a set can have many duplicates with a base of different fixed items, so it can be A general,
+   *  B under some restrictions C, under different ones , so B and C are duplicates of A.
+   * @field 
+   * @private 
+   */
+  duplicated : [],
 
   /**
    * The Solr parameters.
@@ -60,11 +71,24 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
   manager: null,
 
   /**
-   * An abstract hook for child implementations.
+   * A reference to the set to which it belogns in the manager.
+   *
+   * @field
+   * @private
+   * @type integer
+   */
+  set: null,
+
+  /**
+   * It creates the query and fq parameters with the correct types.
    *
    * <p>This method should do any necessary one-time initializations.</p>
    */
-  init: function () {},
+  init: function () {
+	  this.params['q'] = new AjaxSolr.QueryParameter();
+	  this.params['fq']= new AjaxSolr.FQParameter();
+  },
+
 
   /**
    * Some Solr parameters may be specified multiple times. It is easiest to
@@ -79,7 +103,7 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
    * @see http://lucene.apache.org/solr/api/org/apache/solr/handler/DisMaxRequestHandler.html
    */
   isMultiple: function (name) {
-    return name.match(/^(?:bf|bq|facet\.date|facet\.date\.other|facet\.date\.include|facet\.field|facet\.pivot|facet\.range|facet\.range\.other|facet\.range\.include|facet\.query|fq|group\.field|group\.func|group\.query|pf|qf)$/);
+    return name.match(/^(?:bf|bq|q|facet\.date|facet\.date\.other|facet\.date\.include|facet\.field|facet\.pivot|facet\.range|facet\.range\.other|facet\.range\.include|facet\.query|fq|group\.field|group\.func|group\.query|pf|qf)$/);
   },
 
   /**
@@ -100,7 +124,14 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
     }
     return this.params[name];
   },
-
+  /**
+  * adds a duplicate to the current set
+  * @param {int} setD, the set that receives the changes
+  */ 
+   
+   addDuplicate: function (setD){
+        this.duplicated.push(setD);
+   },
   /**
    * If the parameter may be specified multiple times, returns the values of
    * all identically-named parameters. If the parameter may be specified only
@@ -129,6 +160,7 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
    * If the parameter may be specified multiple times, adds the given parameter
    * to the list of identically-named parameters, unless one already exists with
    * the same value. If it may be specified only once, replaces the parameter.
+   * If no parameter is defined then it deletes the current value...
    *
    * @param {String} name The name of the parameter.
    * @param {AjaxSolr.Parameter} [param] The parameter.
@@ -158,21 +190,23 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
   },
 
   /**
-   * Deletes a parameter.
+   * Deletes a parameter. As usually only queries as deleted, this leaves the parameter empty but still is there.
+   * not recursive to duplicates
    *
    * @param {String} name The name of the parameter.
-   * @param {Number} [index] The index of the parameter.
+   * @param {Number} [index] The index of the parameter. if undefined, then all elements are removed
    */
-  remove: function (name, index) {
+  remove: function (name, index) {  
+    var sets = [];
+    var removed;
     if (index === undefined) {
-      delete this.params[name];
+      removed= this.params[name].removeAll();
     }
     else {
-      this.params[name].splice(index, 1);
-      if (this.params[name].length == 0) {
-        delete this.params[name];
-      }
+      removed= this.params[name].removeAll(index); 
     }
+    if (removed) sets[0]=this.set;
+    return sets;	      
   },
 
   /**
@@ -180,7 +214,7 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
    *
    * @param {String} name The name of the parameter.
    * @param {String|Number|String[]|Number[]|RegExp} value The value.
-   * @returns {String|Number[]} The indices of the parameters found.
+   * @returns {String|Number[]} The indices of the parameters found. false if none found
    */
   find: function (name, value) {
     if (this.params[name] !== undefined) {
@@ -214,7 +248,7 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
    * @returns {AjaxSolr.Parameter|Boolean} The parameter, or false.
    */
   addByValue: function (name, value, locals) {
-    if (locals === undefined) {
+   if (locals === undefined) {
       locals = {};
     }
     if (this.isMultiple(name) && AjaxSolr.isArray(value)) {
@@ -228,31 +262,129 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
       return this.add(name, new AjaxSolr.Parameter({ name: name, value: value, locals: locals }));
     }
   },
+  
+  /**
+   * If the parameter may be specified multiple times, creates a parameter using
+   * the given name and value, and adds it to the list of identically-named
+   * parameters, unless one already exists with the same value. If it may be
+   * specified only once, replaces the parameter if the value is higher than the previous one.
+   *
+   * @param {String} name The name of the parameter.
+   * @param {String|Number|String[]|Number[]} value The value.
+   * @returns {AjaxSolr.Parameter|Boolean} The parameter, or false.
+   */
+  upgradeByValue: function (name, value, locals) {
+   if (locals === undefined) {
+      locals = {};
+    }
+   if (this.isMultiple(name) && AjaxSolr.isArray(value)) {
+      var ret = [];
+      for (var i = 0, l = value.length; i < l; i++) {
+        ret.push(this.add(name, new AjaxSolr.Parameter({ name: name, value: value[i], locals: locals })));
+      }
+      return ret;
+    }
+    else {
+      return this.add(name, new AjaxSolr.Parameter({ name: name, value: value, locals: locals }));
+    }
+  },
+  
+  /**
+   * Adds a query, a query has three parameters
+   *
+   * @param {String} name the kind of query, only fq and q.
+   * @param  {string} field  field  to which the query refers
+   * @param  {string} value value of the query
+   * @param  {bool} fixed, fixed queryes are not removed when doing a remove all  
+   * @returns {AjaxSolr.Parameter|Boolean} The parameter, or false.
+   */
+  addQByValue: function (name, field, value,fixed,boolValue) {
+      var sets=[];
+	  if (this.params[name].addItem(field, value,fixed,boolValue)){
+	    sets[0]=this.set;
+	  }
+	  // add to duplicates
+	  // should it be copied if not changed?
+	  for (var set=0;set<this.duplicated.length;set++){
+	    var extraSets=this.manager.store[this.duplicated[set]].addQByValue(name, field, value,fixed,boolValue);
+        sets=sets.concat(extraSets);
+	  }
+	  return sets;
+  },  
+  
+  /**
+   * changes de And/or/not mode of a query or filter query 
+   *
+   * @param {String} name the kind of query, only fq and q.
+   * @param  {string} query  the query to change
+   * @param  {string} newBool the new boolean operator, if undefined it rotates beween or/and/not must be " ", "+" or "-"
+   * @returns {AjaxSolr.Parameter|Boolean} true if done or  false if not found or fixed.
+   */
+  changeQByValue: function (name, query, newBool) {
+      var sets=[];
+      if (this.params[name]=== undefined) return sets
+      if (this.params[name].changeItem(query,newBool)){
+	    sets[0]=this.set;
+	  }
+	  // change to duplicates
+	  // should it be copied if not changed?
+	  for (var set=0;set<this.duplicated.length;set++){
+	    var extraSets=this.manager.store[this.duplicated[set]].changeQByValue(name, query, newBool);
+        sets=sets.concat(extraSets);
+	  }
+	  return sets;	 
+  }, 
 
   /**
    * Deletes any parameter with a matching value.
+   * if value is undefined it deletes all elements with matching name
    *
    * @param {String} name The name of the parameter.
    * @param {String|Number|String[]|Number[]|RegExp} value The value.
    * @returns {String|Number[]} The indices deleted.
    */
-  removeByValue: function (name, value) {
-    var indices = this.find(name, value);
-    if (indices) {
+  removeByValue: function (name, value) { 
+    var sets=[];
+    var indices=undefined;
+    if (value!== undefined){ 
+        indices = this.find(name, value);
+     }
+    if (indices !==false) {
       if (AjaxSolr.isArray(indices)) {
         for (var i = indices.length - 1; i >= 0; i--) {
           this.remove(name, indices[i]);
         }
       }
       else {
-        this.remove(indices);
+        this.remove(name,indices);
       }
+      sets[0]=this.set;
     }
-    return indices;
+ 	for (var set=0;set<this.duplicated.length;set++){
+	    var extraSets=this.manager.store[this.duplicated[set]].removeByValue(name, value);
+        sets=sets.concat(extraSets);
+	 }   
+    return sets;
   },
-
+  
   /**
-   * Returns the Solr parameters as a query string.
+   * Returns the Solr parameters for q and fq as a query string.
+   *
+   * <p>IE6 calls the default toString() if you write <tt>store.toString()
+   * </tt>. So, we need to choose another name for toString().</p>
+   */
+  queryString: function (name) {
+     if (this.params[name]!== undefined) {
+		  var str=this.params[name].qString();
+		  	if (str!=null && str!=""){
+			  return str;
+	  	  }
+	  }
+	  return null;
+    },
+    
+   /**
+   * Returns the Solr query parameters as a query string.
    *
    * <p>IE6 calls the default toString() if you write <tt>store.toString()
    * </tt>. So, we need to choose another name for toString().</p>

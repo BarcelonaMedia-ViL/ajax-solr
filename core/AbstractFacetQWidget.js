@@ -2,20 +2,13 @@
 
 /**
  * Baseclass for all facet widgets.
- * Joan Codina: Sets are added in order to indicate from which set the
- * data must be taken
+ *
  * @class AbstractFacetWidget
  * @augments AjaxSolr.AbstractWidget
-*  
  */
 AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
   /** @lends AjaxSolr.AbstractFacetWidget.prototype */
   {
-  /**
-   * This widget will by default set the offset parameter to 0 on each request.
-   */
-  start: 0,
-
   /**
    * The field to facet on.
    *
@@ -31,17 +24,20 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
    * @field
    * @public
    * @type Boolean
-   * @default true
    */
   multivalue: true,
-
+  
+  /**
+   * contains de data generated in CSV format in order to be exported using exportData function
+   */
+  dataExport: "",
+  
   init: function () {
     this.initStore();
   },
 
   /**
    * Add facet parameters to the parameter store.
-   * As This one is global for the facet field must be set carrefully, is better to set them outside
    */
   initStore: function () {
     /* http://wiki.apache.org/solr/SimpleFacetParameters */
@@ -58,8 +54,6 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
 
     this.manager.store[this.set].addByValue('facet', true);
 
-    // Set facet.field, facet.date or facet.range to truthy values to add
-    // related per-field parameters to the parameter store.
     if (this['facet.field'] !== undefined) {
       this.manager.store[this.set].addByValue('facet.field', this.field);
     }
@@ -91,6 +85,8 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
         this.manager.store[this.set].addByValue('f.' + this.field + '.' + parameters[i], this[parameters[i]]);
       }
     }
+    // init the query sets
+    this.querySet= this.querySet.split(",");
   },
 
   /**
@@ -98,7 +94,7 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
    *   widget's facet field.
    */
   isEmpty: function () {
-    return !this.manager.store[this.set].find('fq', new RegExp('^-?' + this.field + ':'));
+    return !this.manager.store[this.set].find('q', new RegExp('^-?' + this.field + ':'));
   },
 
   /**
@@ -106,11 +102,23 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
    *
    * @returns {Boolean} Whether the selection changed.
    */
-  set: function (value) {
+  set: function (value,set) {
     return this.changeSelection(function () {
-      var a= this.manager.store[this.set].removeByValue('fq', new RegExp('^-?' + this.field + ':'));
-      var b = this.manager.store[this.set].addQByValue('fq', this.field, AjaxSolr.Parameter.escapeValue(value),false);
-      return a || b;
+      var sets = this.manager.store[this.querySet[this.set]].removeByValue('q', new RegExp('^-?' + this.field + ':'));
+      var sets2 = this.manager.store[this.querySet[this.set]].addQByValue('q', this.field, AjaxSolr.Parameter.escapeValue(value),false);
+      // union of sets and sets2
+          for (var j=0;j<sets2.legth;j++){
+            s=sets2[j];
+            found=false;
+            for (var k=0;k<sets.legth;k++){
+                if (sets[k]==s){
+                    found=true;
+                    break;
+                }
+            }
+            if(!found) sets.push(s);
+        }
+      return sets;
     });
   },
 
@@ -119,9 +127,9 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
    *
    * @returns {Boolean} Whether a filter query was added.
    */
-  add: function (value) {
+  add: function (value,set) {
     return this.changeSelection(function () {
-      return this.manager.store[this.querySet[this.set]].addQByValue('fq', this.field , AjaxSolr.Parameter.escapeValue(value),false); //false because is not fixed.
+      return this.manager.store[this.querySet[set]].addQByValue('q', this.field , AjaxSolr.Parameter.escapeValue(value),false,"+"); //false because is not fixed.
     });
   },
 
@@ -132,7 +140,7 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
    */
   remove: function (value) {
     return this.changeSelection(function () {
-      return this.manager.store[this.querySet[this.set]].removeByValue('fq', this.fq(value));
+      return this.manager.store[this.querySet[this.set]].removeByValue('q', this.fq(value));
     });
   },
 
@@ -143,7 +151,7 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
    */
   clear: function () {
     return this.changeSelection(function () {
-      return this.manager.store[this.querySet[this.set]].removeByValue('fq', new RegExp('^-?' + this.field + ':'));
+      return this.manager.store[this.querySet[this.set]].removeByValue('q', new RegExp('^-?' + this.field + ':'));
     });
   },
 
@@ -254,15 +262,14 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
   },
 
   /**
-   * @param {Object} obj The value and set of the object.
+   * @param {String} value The value.
    * @returns {Function} Sends a request to Solr if it successfully adds a
    *   filter query with the given value.
    */
   clickHandler: function (obj) {
 	var value=obj.value;
 	var set=obj.set;
-	var self = this;
-	var meth = this.multivalue ? 'add' : 'set';
+    var self = this, meth = this.multivalue ? 'add' : 'set';
     return function () {
       var sets=self[meth].call(self, value,set);
       if (sets!=null) {
@@ -271,7 +278,20 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
       return false;
     }
   },
-
+  /**
+   * @param {String} value The value.
+   * @returns {Function} Sends a request to Solr if it successfully adds a
+   *   filter query with the given value.
+   */
+  addHandler: function (value,set) {
+      if (set==null) set =this.querySet[this.set];
+      var escaped=AjaxSolr.Parameter.escapeValue(value);
+      var sets=this.manager.store[set].addQByValue('q', this.field ,escaped ,false,"+");
+      if (sets!=null) {
+        this.manager.doSetsRequest(sets,0);
+      }
+      return false;
+   },   
   /**
    * @param {String} value The value.
    * @returns {Function} Sends a request to Solr if it successfully removes a
@@ -295,5 +315,9 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
    */
   fq: function (value, exclude) {
     return (exclude ? '-' : '') + this.field + ':' + AjaxSolr.Parameter.escapeValue(value);
-  }
+  },
+  
+  exportData : function() {
+	    return this.dataExport;	 
+  }  
 });

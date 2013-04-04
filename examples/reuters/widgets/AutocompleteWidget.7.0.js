@@ -26,7 +26,7 @@ AjaxSolr.AutocompleteWidget = AjaxSolr.AbstractTextWidget.extend({
     }).result(function(e, facet) {
       self.requestSent = true;
       if (self.manager.store.addByValue('fq', facet.field + ':' + AjaxSolr.Parameter.escapeValue(facet.value))) {
-        self.doRequest();
+        self.manager.doRequest(0);
       }
     });
 
@@ -35,7 +35,7 @@ AjaxSolr.AutocompleteWidget = AjaxSolr.AbstractTextWidget.extend({
       if (self.requestSent === false && e.which == 13) {
         var value = $(this).val();
         if (value && self.set(value)) {
-          self.doRequest();
+          self.manager.doRequest(0);
         }
       }
     });

@@ -1,10 +1,12 @@
 (function ($) {
 
 AjaxSolr.ResultWidget = AjaxSolr.AbstractWidget.extend({
-  start: 0,
+   start: 0,
+  TimeOut:null,
 
   beforeRequest: function () {
-    $(this.target).html($('<img/>').attr('src', 'images/ajax-loader.gif'));
+    $(this.target).html($('<img/>').attr('src', 'images/ajax-loader.gif'));   
+    if (this.TimeOut!=null)   clearTimeout(this.TimedOut) ;
   },
 
   facetLinks: function (facet_field, facet_values) {
@@ -22,27 +24,44 @@ AjaxSolr.ResultWidget = AjaxSolr.AbstractWidget.extend({
     return links;
   },
 
+
+  facetLink: function (facet_field, facet_value) {
+    var links = [];
+    if (facet_value) {
+    	var link=AjaxSolr.theme('facet_link', facet_value, this.facetHandler(facet_field, facet_value))
+        links.push(link);
+      }
+    return links;
+  },
+
   facetHandler: function (facet_field, facet_value) {
     var self = this;
     return function () {
-      self.manager.store.remove('fq');
-      self.manager.store.addByValue('fq', facet_field + ':' + AjaxSolr.Parameter.escapeValue(facet_value));
-      self.doRequest();
+      self.manager.store[this.set].remove('fq');
+      self.manager.store[this.set].addByValue('fq', facet_field + ':' + AjaxSolr.Parameter.escapeValue(facet_value));
+      self.manager.doRequest(0);
       return false;
     };
   },
 
   afterRequest: function () {
-    $(this.target).empty();
-    for (var i = 0, l = this.manager.response.response.docs.length; i < l; i++) {
-      var doc = this.manager.response.response.docs[i];
-      $(this.target).append(AjaxSolr.theme('result', doc, AjaxSolr.theme('snippet', doc)));
-
+    var self=this;
+    var delay=function() {self.delayedAfterRequest(self);};
+    this.TimedOut=setTimeout(delay,200);
+    //this.TimedOut=setTimeout(function(thisObj) {thisObj.delayedAfterRequest(thisObj);} ,200, this);
+  },
+  delayedAfterRequest: function (self) {
+    $(self.target).empty();
+    for (var i = 0, l = self.manager.response[self.set].response.docs.length; i < l; i++) {
+      var doc = self.manager.response[self.set].response.docs[i];
+      AjaxSolr.theme('result', doc,self);
+      /* f
       var items = [];
-      items = items.concat(this.facetLinks('topics', doc.topics));
-      items = items.concat(this.facetLinks('organisations', doc.organisations));
-      items = items.concat(this.facetLinks('exchanges', doc.exchanges));
+      items = items.concat(this.facetLinks('All_good_comments', doc.All_good_comments));
+      // items = items.concat(this.facetLinks('organisations', doc.organisations));
+      // items = items.concat(this.facetLinks('exchanges', doc.exchanges));
       AjaxSolr.theme('list_items', '#links_' + doc.id, items);
+      */
     }
   },
 

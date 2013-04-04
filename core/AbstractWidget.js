@@ -41,6 +41,14 @@ AjaxSolr.AbstractWidget = AjaxSolr.Class.extend(
   manager: null,
 
   /**
+   * A reference to the set to which it belongs. For internal use only.
+   *
+   * @field
+   * @private
+   * @type integer
+   */
+  set: 0,
+ /**
    * The offset parameter. Set this field to make the widget reset the offset
    * parameter to the given value on each request.
    *
@@ -49,7 +57,17 @@ AjaxSolr.AbstractWidget = AjaxSolr.Class.extend(
    * @type Number
    */
   start: undefined,
-
+  /** 
+   * This query set indicates to which set the action of the widget is directed, this means that,
+   *  for example, in the tagcloudwidget to which set the queries must be added. Sometimes the different
+   *  sets are all copies of a base set, and this one must receive all the queries, the value of -1 indicates that 
+   *  is the same as the set.
+   * 
+   * @field
+   * @private
+   * @type integerr
+   */
+   querySet: null ,
   /**
    * The Solr servlet for this widget. You may prepend the servlet with a core
    * if using multiple cores. If none is set, it will default to the manager's
@@ -66,7 +84,14 @@ AjaxSolr.AbstractWidget = AjaxSolr.Class.extend(
    *
    * <p>This method should do any necessary one-time initializations.</p>
    */
-  init: function () {},
+  init: function () {
+	     if (this.querySet!=null) {
+	    	 this.querySet= this.querySet.split(",");
+	     } else {
+	    	 this.querySet=[];
+	         this.querySet[this.set]=this.set;
+	     }
+  },
 
   /** 
    * An abstract hook for child implementations.

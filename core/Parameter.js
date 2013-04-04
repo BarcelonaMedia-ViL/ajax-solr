@@ -45,13 +45,57 @@ AjaxSolr.Parameter = AjaxSolr.Class.extend(
    */
   val: function (value) {
     if (value === undefined) {
-      return this.value;
+      return [ this.value ] ;
     }
     else {
       this.value = value;
     }
   },
 
+  /**
+   * replaces de parameter
+   * .
+   *
+   * @param value is a Parameter 
+   * @returns false when the value already exists .
+   */
+  add: function (param) {
+    if (param.value === undefined) {
+    	this.value=null;
+    	return true;
+    } else {
+    	this.value=param.value;
+		return true;
+    }
+  }, 
+  
+  /**
+   * Deletes a parameter.
+   *
+   * @param {String} name The name of the parameter.
+   * @param {Number} [index] The index of the parameter.
+   * @return true when the parameter is empty
+   */
+  removeAll: function (index) {
+	  this.value=null;
+	  this.locals=[];
+      return true;
+  },
+  
+  
+  /**
+   * Finds all parameters with matching values.
+   *
+   * @param {String|Number|String[]|Number[]|RegExp} value The value.
+   * @returns {String|Number[]} The indices of the parameters found.
+   */
+  find: function (name,value) {
+      if (AjaxSolr.equals(this.value, value)) {
+          return name;
+       }  
+  },	  
+	  
+	  
   /**
    * Returns the value of a local parameter. If called with a second argument,
    * sets the value of a local parameter.
@@ -65,7 +109,9 @@ AjaxSolr.Parameter = AjaxSolr.Class.extend(
       return this.locals[name];
     }
     else {
+      var old=this.locals[name];
       this.locals[name] = value;
+      return old;
     }
   },
 
@@ -95,8 +141,8 @@ AjaxSolr.Parameter = AjaxSolr.Class.extend(
 
     var prefix = pairs.length ? '{!' + pairs.join('%20') + '}' : '';
 
-    if (this.value) {
-      return this.name + '=' + prefix + this.valueString(this.value);
+    if (this.value !== undefined) {
+      return [ this.name + '=' + prefix + this.valueString(this.value) ];
     }
     // For dismax request handlers, if the q parameter has local params, the
     // q parameter must be set to a non-empty value. In case the q parameter
@@ -170,11 +216,17 @@ AjaxSolr.Parameter = AjaxSolr.Class.extend(
  * @returns {String} The escaped value.
  */
 AjaxSolr.Parameter.escapeValue = function (value) {
-  // If the field value has a space, colon, quotation mark or forward slash
-  // in it, wrap it in quotes, unless it is a range query or it is already 
-  // wrapped in quotes.
-  if (value.match(/[ :\/"]/) && !value.match(/[\[\{]\S+ TO \S+[\]\}]/) && !value.match(/^["\(].*["\)]$/)) {
-    return '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+  // If the field value has a space or a colon in it, wrap it in quotes,
+  // unless it is a range query or it is already wrapped in quotes.
+  if (value.match(/[ :]/) && !value.match(/[\[\{] *\S+ +TO +\S+ *[\]\}]/) && !value.match(/^["\(].*["\)]$/)) {
+    return '"' + value + '"';
   }
   return value;
+}
+
+AjaxSolr.Parameter.escapeAllValue = function (value) {
+  // If the field value has a space or a colon in it, wrap it in quotes,
+  // unless it is a range query or it is already wrapped in quotes.
+  var newvalue=value.replace(/([\[\]\)\(\:"'+-])/g,"\\$1");
+  return  newvalue ;
 }
