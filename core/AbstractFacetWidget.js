@@ -34,6 +34,10 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
    * @default true
    */
   multivalue: true,
+  /**
+   * contains the data generated in CSV format in order to be exported using exportData function
+   */
+  dataExport: "",
 
   init: function () {
     this.initStore();
@@ -295,5 +299,9 @@ AjaxSolr.AbstractFacetWidget = AjaxSolr.AbstractWidget.extend(
    */
   fq: function (value, exclude) {
     return (exclude ? '-' : '') + this.field + ':' + AjaxSolr.Parameter.escapeValue(value);
-  }
+  },
+  
+  exportData : function() {
+	    return this.dataExport;	 
+  }  
 });

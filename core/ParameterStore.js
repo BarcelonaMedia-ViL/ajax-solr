@@ -103,7 +103,7 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
    * @see http://lucene.apache.org/solr/api/org/apache/solr/handler/DisMaxRequestHandler.html
    */
   isMultiple: function (name) {
-    return name.match(/^(?:bf|bq|q|facet\.date|facet\.date\.other|facet\.date\.include|facet\.field|facet\.pivot|facet\.range|facet\.range\.other|facet\.range\.include|facet\.query|fq|group\.field|group\.func|group\.query|pf|qf)$/);
+    return name.match(/^(?:bf|bq|facet\.date|facet\.date\.other|facet\.date\.include|facet\.field|facet\.pivot|facet\.range|facet\.range\.other|facet\.range\.include|facet\.query|group\.field|group\.func|group\.query|pf|qf)$/);
   },
 
   /**
@@ -184,8 +184,13 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
       }
     }
     else {
-      this.params[name] = param;
-    }
+       if (this.params[name] === undefined) {
+            this.params[name] = new AjaxSolr.Parameter({name: name});
+	  } 
+      if (false === this.params[name].add(param) ) {
+    	  return false;
+      }
+   }
     return param;
   },
 
@@ -218,20 +223,7 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
    */
   find: function (name, value) {
     if (this.params[name] !== undefined) {
-      if (this.isMultiple(name)) {
-        var indices = [];
-        for (var i = 0, l = this.params[name].length; i < l; i++) {
-          if (AjaxSolr.equals(this.params[name][i].val(), value)) {
-            indices.push(i);
-          }
-        }
-        return indices.length ? indices : false;
-      }
-      else {
-        if (AjaxSolr.equals(this.params[name].val(), value)) {
-          return name;
-        }
-      }
+       return this.params[name].find(name,value);
     }
     return false;
   },
@@ -394,11 +386,13 @@ AjaxSolr.ParameterStore = AjaxSolr.Class.extend(
     for (var name in this.params) {
       if (this.isMultiple(name)) {
         for (var i = 0, l = this.params[name].length; i < l; i++) {
-          params.push(this.params[name][i].string());
+          var param = this.params[name][i].string()
+          if (param!=null)params.push(param);
         }
       }
       else {
-        params.push(this.params[name].string());
+        var param =this.params[name].string()
+         if (param!=null)params.push(param);
       }
     }
     return AjaxSolr.compact(params).join('&');

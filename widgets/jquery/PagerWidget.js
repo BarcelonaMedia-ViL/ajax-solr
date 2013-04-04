@@ -183,7 +183,7 @@ AjaxSolr.PagerWidget = AjaxSolr.AbstractWidget.extend(
   clickHandler: function (page) {
     var self = this;
     return function () {
-      self.manager.store.get('start').val((page - 1) * self.perPage());
+      self.manager.store[self.set].get('start').val((page - 1) * self.perPage());
       self.manager.doSetsRequest([self.set]);
       return false;
     }
